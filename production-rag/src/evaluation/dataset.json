@@ -1,0 +1,12 @@
+[
+  {
+    "question": "How many paid leaves do I get after 2 years of service?",
+    "ground_truth": "Employees who have completed 2 years of continuous service are eligible for 24 paid leaves per calendar year.",
+    "expected_doc": "HR_Policy_2025.pdf"
+  },
+  {
+    "question": "What is the policy for remote work requests?",
+    "ground_truth": "Remote work must be approved by your direct manager and HR at least two weeks in advance.",
+    "expected_doc": "HR_Policy_2025.pdf"
+  }
+]

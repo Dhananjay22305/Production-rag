@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production RAG Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h2 class="logo">Production RAG</h2>
+            
+            <!-- New Chat Action Button -->
+            <button id="new-chat-btn" class="sidebar-action-btn">
+                <i class="fa-solid fa-plus"></i> New Chat
+            </button>
+
+            <div class="nav-menu">
+                <button class="nav-btn active" data-tab="chat-tab">
+                    <i class="fa-solid fa-comments"></i> Chat & Query
+                </button>
+                <button class="nav-btn" data-tab="ingest-tab">
+                    <i class="fa-solid fa-file-arrow-up"></i> Document Ingestion
+                </button>
+            </div>
+
+            <!-- Chat History Section -->
+            <div class="history-section">
+                <div class="history-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Sessions</div>
+                <div id="history-list" class="history-list">
+                    <!-- Dynamic past chat sessions will appear here -->
+                    <div class="history-item active">Current Session</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Chat & Query Tab -->
+            <div id="chat-tab" class="tab-content active">
+                <div class="chat-header">
+                    <h2>Enterprise Knowledge Assistant</h2>
+                    <p>Ask questions grounded strictly in your ingested corporate documents.</p>
+                </div>
+                <div id="chat-box" class="chat-box">
+                    <div class="message ai-message">
+                        <div class="msg-icon"><i class="fa-solid fa-robot"></i></div>
+                        <div class="msg-body">Hello! I am your local Llama3.2-powered RAG assistant. Ingest a document in the ingestion tab, then ask me anything here.</div>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <textarea id="user-query" placeholder="Ask a question about your documents..." rows="1"></textarea>
+                    <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+
+            <!-- Document Ingestion Tab -->
+            <div id="ingest-tab" class="tab-content">
+                <div class="ingest-header">
+                    <h2>Document Ingestion Hub</h2>
+                    <p>Upload PDF documents to parse, chunk, and embed them into Qdrant.</p>
+                </div>
+                <div class="upload-dropzone" id="dropzone">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <p>Drag & drop your PDF here, or <label for="file-input" class="browse-link">browse</label></p>
+                    <input type="file" id="file-input" accept=".pdf" hidden>
+                </div>
+                <div id="upload-status" class="upload-status hidden">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span id="status-text">Processing document...</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Source Chunk Inspector Drawer -->
+    <div id="citation-drawer" class="drawer hidden">
+        <div class="drawer-header">
+            <h3><i class="fa-solid fa-file-lines"></i> Retrieved Source Chunk Inspector</h3>
+            <button id="close-drawer"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="drawer-content" class="drawer-content">
+            <!-- Raw chunk content populated on click -->
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+</body>
+</html>
