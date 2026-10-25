@@ -13,14 +13,9 @@ async def root():
 @router.post("/query")
 async def query_rag(query: str):
     try:
-        # Lazy load retriever and generator inside the endpoint
         retriever = HybridRetriever()
         generator = LLMGenerator()
-        
-        # Retrieve chunks
         retrieved_chunks = retriever.retrieve(query)
-        
-        # Generate answer stream or response
         return {"query": query, "results": retrieved_chunks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -32,12 +27,11 @@ async def upload_document(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             buffer.write(await file.read())
             
-        # Parse PDF using pypdf
         parsed_data = parse_pdf(file_path)
         
         if os.path.exists(file_path):
             os.remove(file_path)
             
-        return {"filename": file.filename, "status": "Successfully parsed", "data": parsed_data[:2]}
+        return {"filename": file.filename, "status": "Successfully parsed", "chunks_count": len(parsed_data)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")

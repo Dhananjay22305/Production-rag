@@ -1,6 +1,7 @@
 import re
 from typing import List, Dict, Any
 from pypdf import PdfReader
+import os
 
 class DocumentParser:
     """Handles PDF extraction, text cleaning, and chunking strategies."""
@@ -8,6 +9,9 @@ class DocumentParser:
     @staticmethod
     def extract_text_from_pdf(file_path: str) -> List[Dict[str, Any]]:
         """Extracts text page by page with metadata citations."""
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found at: {file_path}")
+            
         reader = PdfReader(file_path)
         pages_data = []
         
@@ -100,3 +104,12 @@ class DocumentParser:
                 chunk_id += 1
                 
         return chunks
+
+def parse_pdf(file_path: str, doc_name: str = "document") -> List[Dict[str, Any]]:
+    """
+    Wrapper function to maintain backward compatibility with routes.py 
+    while utilizing the DocumentParser class.
+    """
+    pages_data = DocumentParser.extract_text_from_pdf(file_path)
+    chunks = DocumentParser.chunk_sentence_aware(pages_data, doc_name=doc_name)
+    return chunks
