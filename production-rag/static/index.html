@@ -48,7 +48,7 @@
                 <div id="chat-box" class="chat-box">
                     <div class="message ai-message">
                         <div class="msg-icon"><i class="fa-solid fa-robot"></i></div>
-                        <div class="msg-body">Hello! I am your local Llama3.2-powered RAG assistant. Ingest a document in the ingestion tab, then ask me anything here.</div>
+                        <div class="msg-body">Hello! I am your local Llama3.2-powered RAG assistant. Ingest documents in the ingestion tab, then ask me anything here.</div>
                     </div>
                 </div>
                 <div class="chat-input-area">
@@ -69,8 +69,12 @@
                     <input type="file" id="file-input" accept=".pdf" hidden>
                 </div>
                 <div id="upload-status" class="upload-status hidden">
-                    <i class="fa-solid fa-spinner fa-spin"></i>
-                    <span id="status-text">Processing document...</span>
+                    <div class="status-header">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span id="status-text">Processing document...</span>
+                    </div>
+                    <!-- Container listing all uploaded documents side-by-side -->
+                    <div id="uploaded-files-list" class="uploaded-files-chips"></div>
                 </div>
             </div>
         </main>

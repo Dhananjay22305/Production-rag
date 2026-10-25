@@ -17,6 +17,7 @@ navBtns.forEach(btn => {
 let chatHistory = [];
 let sessionList = [{ id: Date.now(), title: "Current Session", history: [] }];
 let activeSessionIndex = 0;
+let activeUploadedFiles = [];
 
 const sendBtn = document.getElementById('send-btn');
 const userQueryInput = document.getElementById('user-query');
@@ -121,7 +122,7 @@ async function handleSendMessage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 question: query, 
-                top_k: 4, 
+                top_k: 3, 
                 history: chatHistory.slice(0, -1) 
             })
         });
@@ -232,6 +233,7 @@ userQueryInput.addEventListener('keydown', (e) => {
 const fileInput = document.getElementById('file-input');
 const uploadStatus = document.getElementById('upload-status');
 const statusText = document.getElementById('status-text');
+const uploadedFilesList = document.getElementById('uploaded-files-list');
 
 fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -258,8 +260,20 @@ fileInput.addEventListener('change', async (e) => {
         
         icon.className = "fa-solid fa-check";
         icon.style.color = "#22c55e";
+        statusText.textContent = `Successfully indexed ${result.filename}! Total Active Documents: ${result.total_documents_count}`;
 
-        statusText.textContent = `Successfully indexed ${result.filename} into Qdrant! (${result.total_chunks_created} chunks)`;
+        // Update active files array from backend registry
+        activeUploadedFiles = result.active_documents;
+        
+        // Clear and re-render all active document chips side-by-side
+        uploadedFilesList.innerHTML = '';
+        activeUploadedFiles.forEach(docName => {
+            const chip = document.createElement('div');
+            chip.classList.add('doc-chip');
+            chip.innerHTML = `<i class="fa-solid fa-file-pdf"></i> ${docName}`;
+            uploadedFilesList.appendChild(chip);
+        });
+
     } catch (err) {
         icon.className = "fa-solid fa-triangle-exclamation";
         icon.style.color = "#ef4444";
