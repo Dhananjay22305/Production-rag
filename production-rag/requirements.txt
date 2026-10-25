@@ -7,3 +7,4 @@ requests
 qdrant-client
 pypdf
 ollama
+python-multipart
