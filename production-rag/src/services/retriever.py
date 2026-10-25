@@ -46,7 +46,7 @@ class HybridRetriever:
         if not chunks:
             return
 
-        batch_size = 50  # Process in safe batches to prevent memory/payload overload
+        batch_size = 50 
         total_chunks = len(chunks)
         
         for i in range(0, total_chunks, batch_size):
@@ -56,8 +56,8 @@ class HybridRetriever:
             for chunk in batch:
                 vector = self._get_embedding(chunk["text"])
                 
-                # Convert custom string ID to a valid deterministic UUID v5 for Qdrant compatibility
-                string_id = str(chunk["chunk_id"])
+                # Combine doc_name and chunk_id so different PDFs never collide and overwrite each other
+                string_id = f"{chunk['doc_name']}_{chunk['chunk_id']}"
                 point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, string_id))
                 
                 points.append(
@@ -68,12 +68,11 @@ class HybridRetriever:
                             "doc_name": chunk["doc_name"],
                             "page_number": chunk["page_number"],
                             "text": chunk["text"],
-                            "original_chunk_id": string_id
+                            "original_chunk_id": chunk['chunk_id']
                         }
                     )
                 )
             
-            # Upsert current batch into Qdrant
             self.client.upsert(
                 collection_name=self.collection_name,
                 points=points
