@@ -6,9 +6,9 @@ import os
 
 router = APIRouter()
 
-@router.get("/")
-async def root():
-    return {"status": "Production RAG API is running successfully!"}
+@router.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 @router.post("/query")
 async def query_rag(query: str):
