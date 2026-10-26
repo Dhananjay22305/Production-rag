@@ -20,8 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. Include API routes first so they take precedence
-app.include_router(api_router, prefix="/api/v1")
+# 1. Include API routes directly at the root level (so /upload and /query match your frontend)
+app.include_router(api_router)
 
 # 2. Mount your static frontend folder at the root path
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
