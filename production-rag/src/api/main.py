@@ -1,31 +1,31 @@
-from fastapi import FastAPI, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-from src.api.routes import router as api_router
+from pathlib import Path
 
-class SPAStaticFiles(StaticFiles):
-    """Custom static file handler that bypasses API routes so they never get swallowed."""
-    async def get_response(self, path: str, scope: Request):
-        if path.startswith("api/") or path == "upload" or path == "query" or path == "health":
-            raise 404
-        return await super().get_response(path, scope)
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
+from src.api.routes import root_router, router as api_router
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(
     title="Production RAG Engine",
     version="1.0.0",
-    description="Local enterprise RAG system powered by Qdrant, BM25, and LLMs."
+    description="Enterprise RAG system with BM25 retrieval and Groq LLM generation.",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 1. Register API routes first
+# 1. API routes first so the static mount never swallows them.
 app.include_router(api_router)
+app.include_router(root_router)
 
-# 2. Mount static files using the custom handler at the root
-app.mount("/", SPAStaticFiles(directory="static", html=True), name="static")
+# 2. Static frontend at the root (index.html, script.js, style.css).
+app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
