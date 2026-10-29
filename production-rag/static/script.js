@@ -12,46 +12,56 @@ let chatHistory = [];
 let activeDocuments = [];
 
 // Event Listeners
-sendButton.addEventListener('click', handleSendMessage);
-queryInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSendMessage();
-    }
-});
-
-// Drag and drop setup
-['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropZone.addEventListener(eventName, preventDefaults, false);
-});
-
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
+if (sendButton) {
+    sendButton.addEventListener('click', handleSendMessage);
+}
+if (queryInput) {
+    queryInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    });
 }
 
-['dragenter', 'dragover'].forEach(eventName => {
-    dropZone.addEventListener(eventName, () => dropZone.classList.add('border-indigo-500', 'bg-indigo-950/20'), false);
-});
+// Allow clicking anywhere on the drop zone to trigger file selection
+if (dropZone && fileInput) {
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+}
 
-['dragleave', 'drop'].forEach(eventName => {
-    dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/20'), false);
-});
+// Drag and drop setup
+if (dropZone) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
 
-dropZone.addEventListener('drop', (e) => {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-    if (files.length > 0) {
-        fileInput.files = files;
-        handleFileUpload(files[0]);
-    }
-});
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('border-indigo-500', 'bg-indigo-950/20'), false);
+    });
 
-fileInput.addEventListener('change', (e) => {
-    if (fileInput.files.length > 0) {
-        handleFileUpload(fileInput.files[0]);
-    }
-});
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/20'), false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0 && fileInput) {
+            fileInput.files = files;
+            handleFileUpload(files[0]);
+        }
+    });
+}
+
+if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+        if (fileInput.files.length > 0) {
+            handleFileUpload(fileInput.files[0]);
+        }
+    });
+}
 
 // Initial health & doc check on load
 async function checkBackendHealth() {
@@ -75,14 +85,11 @@ async function handleSendMessage() {
     const query = queryInput.value.trim();
     if (!query) return;
 
-    // Append user message
     appendMessage(query, 'user');
     queryInput.value = '';
     
-    // Push to history
     chatHistory.push({ role: 'user', content: query });
 
-    // Create AI response placeholder
     const aiMsgDiv = appendMessage('', 'ai', true);
     const msgBody = aiMsgDiv.querySelector('.message-body');
     const sourcesContainer = aiMsgDiv.querySelector('.sources-container');
@@ -114,10 +121,7 @@ async function handleSendMessage() {
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Push assistant response to history
         chatHistory.push({ role: 'assistant', content: fullResponse });
-
-        // Fetch retrieval preview chunks
         fetchRetrievedChunksForQuery(query, sourcesContainer);
 
     } catch (error) {
@@ -126,7 +130,6 @@ async function handleSendMessage() {
     }
 }
 
-// Fetch and render context chunks used for answering
 async function fetchRetrievedChunksForQuery(query, container) {
     try {
         const res = await fetch(`/api/v1/retrieval-preview?question=${encodeURIComponent(query)}&top_k=3`);
@@ -217,14 +220,18 @@ function appendMessage(text, sender, isStreamingPlaceholder = false) {
 function createUploadStatusBanner() {
     const banner = document.createElement('div');
     banner.id = 'uploadStatus';
-    dropZone.parentNode.appendChild(banner);
+    if (dropZone && dropZone.parentNode) {
+        dropZone.parentNode.appendChild(banner);
+    } else {
+        document.body.appendChild(banner);
+    }
     return banner;
 }
 
 function renderDocumentList() {
     if (!documentList) return;
     documentList.innerHTML = '';
-    docCount.textContent = activeDocuments.length;
+    if (docCount) docCount.textContent = activeDocuments.length;
 
     if (activeDocuments.length === 0) {
         documentList.innerHTML = '<div class="text-xs text-slate-500 italic">No documents indexed yet.</div>';
@@ -241,4 +248,9 @@ function renderDocumentList() {
 
 function escapeHtml(str) {
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
 }
