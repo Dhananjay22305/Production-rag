@@ -1,107 +1,129 @@
-// DOM Elements
-const chatMessages = document.getElementById('chatMessages');
-const queryInput = document.getElementById('queryInput');
-const sendButton = document.getElementById('sendButton');
-const fileInput = document.getElementById('fileInput');
-const dropZone = document.getElementById('dropZone');
-const documentList = document.getElementById('documentList');
-const docCount = document.getElementById('docCount');
+// Tab Switching Logic
+const navBtns = document.querySelectorAll('.nav-btn');
+const tabContents = document.querySelectorAll('.tab-content');
 
-// State
+navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        navBtns.forEach(b => b.classList.remove('active'));
+        tabContents.forEach(t => t.classList.remove('active'));
+        
+        btn.classList.add('active');
+        const targetTab = document.getElementById(btn.dataset.tab);
+        targetTab.classList.add('active');
+    });
+});
+
+// Chat State & History Tracking
 let chatHistory = [];
-let activeDocuments = [];
+let sessionList = [{ id: Date.now(), title: "Current Session", history: [] }];
+let activeSessionIndex = 0;
+let activeUploadedFiles = [];
 
-// Event Listeners
-if (sendButton) {
-    sendButton.addEventListener('click', handleSendMessage);
-}
-if (queryInput) {
-    queryInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage();
-        }
+const sendBtn = document.getElementById('send-btn');
+const userQueryInput = document.getElementById('user-query');
+const chatBox = document.getElementById('chat-box');
+const newChatBtn = document.getElementById('new-chat-btn');
+const historyListContainer = document.getElementById('history-list');
+
+// Initialize Sidebar on Load
+updateHistorySidebar();
+
+// New Chat Handler
+newChatBtn.addEventListener('click', () => {
+    // Save current active session state
+    sessionList[activeSessionIndex].history = [...chatHistory];
+
+    // Create a new session and set it active
+    const newSession = {
+        id: Date.now(),
+        title: `Session ${sessionList.length + 1}`,
+        history: []
+    };
+    sessionList.push(newSession);
+    activeSessionIndex = sessionList.length - 1;
+    chatHistory = [];
+
+    renderActiveChatSession();
+    updateHistorySidebar();
+});
+
+function updateHistorySidebar() {
+    historyListContainer.innerHTML = '';
+    sessionList.forEach((session, idx) => {
+        const item = document.createElement('div');
+        item.classList.add('history-item');
+        if (idx === activeSessionIndex) item.classList.add('active');
+        item.textContent = session.title;
+
+        // Click listener to load previous/selected chat
+        item.addEventListener('click', () => {
+            if (activeSessionIndex === idx) return;
+
+            // Sync active state before switching
+            sessionList[activeSessionIndex].history = [...chatHistory];
+            
+            // Switch session pointer
+            activeSessionIndex = idx;
+            chatHistory = [...sessionList[activeSessionIndex].history];
+
+            renderActiveChatSession();
+            updateHistorySidebar();
+        });
+
+        historyListContainer.appendChild(item);
     });
 }
 
-// Allow clicking anywhere on the drop zone to trigger file selection
-if (dropZone && fileInput) {
-    dropZone.addEventListener('click', () => {
-        fileInput.click();
-    });
-}
+function renderActiveChatSession() {
+    chatBox.innerHTML = '';
 
-// Drag and drop setup
-if (dropZone) {
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.add('border-indigo-500', 'bg-indigo-950/20'), false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/20'), false);
-    });
-
-    dropZone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        if (files.length > 0 && fileInput) {
-            fileInput.files = files;
-            handleFileUpload(files[0]);
-        }
-    });
-}
-
-if (fileInput) {
-    fileInput.addEventListener('change', (e) => {
-        if (fileInput.files.length > 0) {
-            handleFileUpload(fileInput.files[0]);
-        }
-    });
-}
-
-// Initial health & doc check on load
-async function checkBackendHealth() {
-    try {
-        const res = await fetch('/api/v1/health');
-        if (res.ok) {
-            const data = await res.json();
-            if (data.active_documents) {
-                activeDocuments = data.active_documents;
-                renderDocumentList();
-            }
-        }
-    } catch (err) {
-        console.error('Health check failed:', err);
+    if (chatHistory.length === 0) {
+        chatBox.innerHTML = `
+            <div class="message ai-message">
+                <div class="msg-icon"><i class="fa-solid fa-robot"></i></div>
+                <div class="msg-body">Started a new session. Ask me anything about your ingested documents!</div>
+            </div>
+        `;
+        return;
     }
-}
-checkBackendHealth();
 
-// Chat Handler
+    // Re-render conversation history for loaded session
+    chatHistory.forEach(msg => {
+        const msgDiv = appendMessage(msg.content, msg.role === 'user' ? 'user' : 'ai');
+        
+        // If user message, fetch citations attached to that question
+        if (msg.role === 'user') {
+            fetchRetrievedChunksForQuery(msg.content, msgDiv);
+        }
+    });
+}
+
 async function handleSendMessage() {
-    const query = queryInput.value.trim();
+    const query = userQueryInput.value.trim();
     if (!query) return;
 
-    appendMessage(query, 'user');
-    queryInput.value = '';
-    
-    chatHistory.push({ role: 'user', content: query });
+    // Auto-update session title based on first query
+    if (chatHistory.length === 0) {
+        sessionList[activeSessionIndex].title = query.length > 25 ? query.substring(0, 25) + '...' : query;
+        updateHistorySidebar();
+    }
 
-    const aiMsgDiv = appendMessage('', 'ai', true);
-    const msgBody = aiMsgDiv.querySelector('.message-body');
-    const sourcesContainer = aiMsgDiv.querySelector('.sources-container');
+    appendMessage(query, 'user');
+    chatHistory.push({ role: 'user', content: query });
+    sessionList[activeSessionIndex].history = [...chatHistory];
+    userQueryInput.value = '';
+
+    const aiMsgDiv = appendMessage('Thinking...', 'ai');
+    const msgBody = aiMsgDiv.querySelector('.msg-body');
 
     try {
         const response = await fetch('/api/v1/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                question: query,
-                top_k: 3,
-                history: chatHistory
+            body: JSON.stringify({ 
+                question: query, 
+                top_k: 3, 
+                history: chatHistory.slice(0, -1) 
             })
         });
 
@@ -110,19 +132,23 @@ async function handleSendMessage() {
         msgBody.textContent = '';
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let fullResponse = '';
+        let fullAssistantResponse = '';
 
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
+            
             const chunk = decoder.decode(value, { stream: true });
-            fullResponse += chunk;
-            msgBody.textContent = fullResponse;
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            fullAssistantResponse += chunk;
+            msgBody.textContent += chunk;
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        chatHistory.push({ role: 'assistant', content: fullResponse });
-        fetchRetrievedChunksForQuery(query, sourcesContainer);
+        chatHistory.push({ role: 'assistant', content: fullAssistantResponse });
+        sessionList[activeSessionIndex].history = [...chatHistory];
+
+        // Fetch retrieval preview to attach interactive citation badges
+        fetchRetrievedChunksForQuery(query, aiMsgDiv);
 
     } catch (error) {
         console.error('Chat request failed:', error);
@@ -130,34 +156,98 @@ async function handleSendMessage() {
     }
 }
 
-async function fetchRetrievedChunksForQuery(query, container) {
+async function fetchRetrievedChunksForQuery(query, aiMsgDiv) {
     try {
         const res = await fetch(`/api/v1/retrieval-preview?question=${encodeURIComponent(query)}&top_k=3`);
         if (!res.ok) return;
         const data = await res.json();
         
         if (data.retrieved_chunks && data.retrieved_chunks.length > 0) {
-            container.innerHTML = '<div class="text-xs font-semibold text-slate-400 mb-1 mt-3">Retrieved Context Sources:</div>';
-            data.retrieved_chunks.forEach((chunk, index) => {
-                const badge = document.createElement('div');
-                badge.className = 'text-[11px] bg-slate-800/80 border border-slate-700/60 rounded p-2 mb-1 text-slate-300 font-mono';
-                badge.innerHTML = `<span class="text-indigo-400 font-bold">[${index+1}] ${chunk.doc_name}</span> (score: ${chunk.score || 'N/A'}): <span class="text-slate-400">${escapeHtml(chunk.text.substring(0, 120))}...</span>`;
-                container.appendChild(badge);
+            const citationsDiv = document.createElement('div');
+            citationsDiv.classList.add('citations-container');
+
+            data.retrieved_chunks.forEach((chunk) => {
+                const pill = document.createElement('button');
+                pill.classList.add('citation-pill');
+                pill.innerHTML = `<i class="fa-solid fa-file-pdf"></i> ${chunk.doc_name} (Pg ${chunk.page_number})`;
+                
+                pill.addEventListener('click', () => {
+                    openDrawerWithChunk(chunk);
+                });
+                citationsDiv.appendChild(pill);
             });
+
+            aiMsgDiv.appendChild(citationsDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     } catch (err) {
-        console.error('Failed to fetch retrieval preview:', err);
+        console.error("Failed to fetch retrieval preview", err);
     }
 }
 
-// File Upload Handler
-async function handleFileUpload(file) {
+function openDrawerWithChunk(chunk) {
+    const drawer = document.getElementById('citation-drawer');
+    const drawerContent = document.getElementById('drawer-content');
+    
+    drawerContent.innerHTML = `
+        <div class="chunk-card">
+            <div class="chunk-meta">Source: ${chunk.doc_name} | Page: ${chunk.page_number} | Chunk ID: ${chunk.chunk_id}</div>
+            <p>${chunk.text}</p>
+        </div>
+    `;
+    drawer.classList.remove('hidden');
+}
+
+document.getElementById('close-drawer').addEventListener('click', () => {
+    document.getElementById('citation-drawer').classList.add('hidden');
+});
+
+function appendMessage(text, sender) {
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'ai-message');
+    
+    const iconDiv = document.createElement('div');
+    iconDiv.classList.add('msg-icon');
+    iconDiv.innerHTML = sender === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+    
+    const bodyDiv = document.createElement('div');
+    bodyDiv.classList.add('msg-body');
+    bodyDiv.textContent = text;
+    
+    messageDiv.appendChild(iconDiv);
+    messageDiv.appendChild(bodyDiv);
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    
+    return messageDiv;
+}
+
+sendBtn.addEventListener('click', handleSendMessage);
+userQueryInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+    }
+});
+
+// File Ingestion Handler
+const fileInput = document.getElementById('file-input');
+const uploadStatus = document.getElementById('upload-status');
+const statusText = document.getElementById('status-text');
+const uploadedFilesList = document.getElementById('uploaded-files-list');
+
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    uploadStatus.classList.remove('hidden');
+    const icon = uploadStatus.querySelector('i');
+    icon.className = "fa-solid fa-spinner fa-spin";
+    icon.style.color = "";
+    statusText.textContent = `Uploading & parsing ${file.name}...`;
+
     const formData = new FormData();
     formData.append('file', file);
-
-    const uploadStatus = document.getElementById('uploadStatus') || createUploadStatusBanner();
-    uploadStatus.className = "mt-4 p-3 rounded-lg bg-slate-900 border border-indigo-500/30 text-sm text-indigo-300 flex items-center justify-between";
-    uploadStatus.innerHTML = `<span>Uploading & indexing <b>${file.name}</b>...</span><i class="fa-solid fa-spinner animate-spin"></i>`;
 
     try {
         const response = await fetch('/api/v1/ingest?strategy=sentence_aware', {
@@ -173,84 +263,26 @@ async function handleFileUpload(file) {
 
         const result = await response.json();
         
-        uploadStatus.className = "mt-4 p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/30 text-sm text-emerald-300 flex items-center justify-between";
-        uploadStatus.innerHTML = `<span>Successfully indexed <b>${result.filename}</b> (${result.chunks_count} chunks)!</span><i class="fa-solid fa-check"></i>`;
+        icon.className = "fa-solid fa-check";
+        icon.style.color = "#22c55e";
+        statusText.textContent = `Successfully indexed ${result.filename}! Total Active Documents: ${result.total_documents_count}`;
 
-        if (result.active_documents) {
-            activeDocuments = result.active_documents;
-            renderDocumentList();
-        }
+        // Update active files array from backend registry
+        activeUploadedFiles = result.active_documents;
+        
+        // Clear and re-render all active document chips side-by-side
+        uploadedFilesList.innerHTML = '';
+        activeUploadedFiles.forEach(docName => {
+            const chip = document.createElement('div');
+            chip.classList.add('doc-chip');
+            chip.innerHTML = `<i class="fa-solid fa-file-pdf"></i> ${docName}`;
+            uploadedFilesList.appendChild(chip);
+        });
+
     } catch (err) {
+        icon.className = "fa-solid fa-triangle-exclamation";
+        icon.style.color = "#ef4444";
         console.error('Ingest failed:', err);
-        uploadStatus.className = "mt-4 p-3 rounded-lg bg-red-950/30 border border-red-500/30 text-sm text-red-300 flex items-center justify-between";
-        uploadStatus.innerHTML = `<span>Error ingesting file: ${err.message}</span><i class="fa-solid fa-triangle-exclamation"></i>`;
+        statusText.textContent = `Error ingesting file: ${err.message}`;
     }
-}
-
-// UI Helpers
-function appendMessage(text, sender, isStreamingPlaceholder = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
-
-    const innerDiv = document.createElement('div');
-    innerDiv.className = `max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-        sender === 'user' 
-            ? 'bg-indigo-600 text-white rounded-br-none' 
-            : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none shadow-lg'
-    }`;
-
-    const bodyDiv = document.createElement('div');
-    bodyDiv.className = 'message-body whitespace-pre-wrap leading-relaxed';
-    bodyDiv.textContent = text;
-    innerDiv.appendChild(bodyDiv);
-
-    if (sender === 'ai') {
-        const sourcesDiv = document.createElement('div');
-        sourcesDiv.className = 'sources-container mt-2';
-        innerDiv.appendChild(sourcesDiv);
-    }
-
-    messageDiv.appendChild(innerDiv);
-    chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    return messageDiv;
-}
-
-function createUploadStatusBanner() {
-    const banner = document.createElement('div');
-    banner.id = 'uploadStatus';
-    if (dropZone && dropZone.parentNode) {
-        dropZone.parentNode.appendChild(banner);
-    } else {
-        document.body.appendChild(banner);
-    }
-    return banner;
-}
-
-function renderDocumentList() {
-    if (!documentList) return;
-    documentList.innerHTML = '';
-    if (docCount) docCount.textContent = activeDocuments.length;
-
-    if (activeDocuments.length === 0) {
-        documentList.innerHTML = '<div class="text-xs text-slate-500 italic">No documents indexed yet.</div>';
-        return;
-    }
-
-    activeDocuments.forEach(docName => {
-        const item = document.createElement('div');
-        item.className = 'flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 mb-1.5';
-        item.innerHTML = `<span class="truncate max-w-[200px]"><i class="fa-solid fa-file-pdf text-red-400 mr-2"></i>${docName}</span><span class="text-emerald-400 font-mono">Active</span>`;
-        documentList.appendChild(item);
-    });
-}
-
-function escapeHtml(str) {
-    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
-
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
+});
